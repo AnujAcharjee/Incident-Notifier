@@ -4,7 +4,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "bun run src/index.ts"
+    "start": "bun run src/index.ts",
+    "ingest": "bun run src/rag/ingest.ts",
+    "test-app": "bun run test-app/src/index.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"
@@ -16,6 +18,9 @@
     "@langchain/core": "^1.2.18",
     "@langchain/google": "^0.2.11",
     "@langchain/langgraph": "^1.5.0",
+    "@langchain/openai": "^1.6.2",
+    "@langchain/qdrant": "^1.0.3",
+    "@langchain/textsplitters": "^1.0.2",
     "dotenv": "^18.0.8",
     "zod": "^4.6.7"
   }
