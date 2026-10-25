@@ -6,7 +6,9 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "ingest": "bun run src/rag/ingest.ts",
-    "test-app": "bun run test-app/src/index.ts"
+    "test-app": "bun run test-app/src/index.ts",
+    "test:telegram": "bun run src/notifications/test-telegram.ts",
+    "get-chat-id": "bun run src/notifications/get-chat-id.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"

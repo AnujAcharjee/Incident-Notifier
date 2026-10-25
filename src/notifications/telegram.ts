@@ -166,7 +166,11 @@ export async function notifyIncident(report: IncidentReport, occurrences = 1): P
 
   // If credentials are present, attempt Telegram dispatch
   try {
-    const text = formatTelegramHtml(report, occurrences);
+    let text = formatTelegramHtml(report, occurrences);
+    if (text.length > 4000) {
+      text = text.slice(0, 3950) + "\n\n<i>[Content truncated due to Telegram size limit]</i>";
+    }
+
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -174,7 +178,7 @@ export async function notifyIncident(report: IncidentReport, occurrences = 1): P
         chat_id: chatId,
         text,
         parse_mode: "HTML",
-        disable_web_page_preview: true,
+        link_preview_options: { is_disabled: true },
       }),
     });
 
