@@ -10,12 +10,31 @@ export interface LogEntry {
 
 export class LokiPusher {
   private lokiUrl: string;
+  private authHeader?: string;
+  private isCloud: boolean;
   private queue: Array<{ entry: LogEntry; timeNano: string }> = [];
   private flushTimer: any = null;
   private isAvailable = true;
 
-  constructor(lokiUrl = process.env.LOKI_URL || "http://localhost:3100") {
-    this.lokiUrl = lokiUrl.replace(/\/$/, "");
+  constructor(
+    lokiUrl = process.env.LOKI_URL || "http://localhost:3100",
+    lokiUser = (process.env.LOKI_USERNAME || "").trim(),
+    lokiPassword = (process.env.LOKI_PASSWORD || "").trim()
+  ) {
+    this.lokiUrl = lokiUrl
+      .trim()
+      .replace(/\/+$/, "")
+      .replace(/\/loki\/api\/v1(\/push)?\/?$/, "")
+      .replace(/\/+$/, "");
+    this.isCloud = Boolean(
+      (process.env.LOKI_URL && process.env.LOKI_URL.includes("grafana.net")) ||
+      (lokiUser && lokiPassword)
+    );
+
+    if (lokiUser && lokiPassword) {
+      this.authHeader = `Basic ${Buffer.from(`${lokiUser}:${lokiPassword}`).toString("base64")}`;
+    }
+
     this.startAutoFlush();
   }
 
@@ -79,26 +98,39 @@ export class LokiPusher {
       values,
     }));
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (this.authHeader) {
+      headers["Authorization"] = this.authHeader;
+    }
+
+    const serviceName = this.isCloud ? "Grafana Cloud Loki" : "Loki";
+
     try {
       const res = await fetch(`${this.lokiUrl}/loki/api/v1/push`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({ streams }),
       });
 
       if (!res.ok) {
         if (this.isAvailable) {
-          console.warn(`[Loki] Push failed (${res.status} ${res.statusText})`);
+          const hint = res.status === 401 && this.isCloud
+            ? " (verify token has 'logs:write' scope in Grafana Cloud Access Policies)"
+            : "";
+          console.warn(`[Loki] Push to ${serviceName} failed (${res.status} ${res.statusText})${hint}`);
           this.isAvailable = false;
         }
       } else {
+        if (!this.isAvailable) {
+          console.log(`[Loki] Connected and pushing logs to ${serviceName} successfully.`);
+        }
         this.isAvailable = true;
       }
-    } catch {
+    } catch (err) {
       if (this.isAvailable) {
-        console.warn(`[Loki] Loki server not reachable at ${this.lokiUrl} (logs preserved on stdout)`);
+        console.warn(`[Loki] ${serviceName} server not reachable at ${this.lokiUrl}: ${(err as Error).message}`);
         this.isAvailable = false;
       }
     }

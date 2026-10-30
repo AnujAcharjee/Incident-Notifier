@@ -17,21 +17,38 @@ let stats = {
 
 async function checkInfrastructure(): Promise<void> {
   const lokiReady = await lokiClient.isReady();
+  const lokiName = ENV.IS_LOKI_CLOUD ? "Grafana Cloud Loki" : "Loki";
   if (lokiReady) {
-    console.log(`\x1b[32m✔ [Infrastructure] Loki is online and ready at ${ENV.LOKI_URL}\x1b[0m`);
+    console.log(`\x1b[32m✔ [Infrastructure] ${lokiName} is online and ready at ${ENV.LOKI_URL}\x1b[0m`);
   } else {
     console.warn(
-      `\x1b[33m▲ [Infrastructure] Loki not reachable at ${ENV.LOKI_URL}. Waiting for logs... (run 'docker compose up -d' if not started)\x1b[0m`
+      `\x1b[33m▲ [Infrastructure] ${lokiName} not reachable at ${ENV.LOKI_URL}. Waiting for logs...${ENV.IS_LOKI_CLOUD ? " (check LOKI_URL and LOKI_USERNAME/LOKI_PASSWORD)" : " (run 'docker compose up -d' if not started)"}\x1b[0m`
     );
   }
 
+  const qdrantHeaders: Record<string, string> = {};
+  if (ENV.QDRANT_API_KEY) {
+    qdrantHeaders["api-key"] = ENV.QDRANT_API_KEY;
+  }
+
+  let qdrantOnline = false;
   try {
-    const qdrantRes = await fetch(`${ENV.QDRANT_URL}/readyz`);
-    if (qdrantRes.ok) {
-      console.log(`\x1b[32m✔ [Infrastructure] Qdrant is online at ${ENV.QDRANT_URL}\x1b[0m`);
-    }
-  } catch {
-    console.warn(`\x1b[33m▲ [Infrastructure] Qdrant not reachable at ${ENV.QDRANT_URL}.\x1b[0m`);
+    const qdrantRes = await fetch(`${ENV.QDRANT_URL}/readyz`, { headers: qdrantHeaders });
+    if (qdrantRes.ok) qdrantOnline = true;
+  } catch {}
+
+  if (!qdrantOnline) {
+    try {
+      const collectionsRes = await fetch(`${ENV.QDRANT_URL}/collections`, { headers: qdrantHeaders });
+      if (collectionsRes.ok) qdrantOnline = true;
+    } catch {}
+  }
+
+  const qdrantName = ENV.IS_QDRANT_CLOUD ? "Qdrant Cloud" : "Qdrant";
+  if (qdrantOnline) {
+    console.log(`\x1b[32m✔ [Infrastructure] ${qdrantName} is online at ${ENV.QDRANT_URL}\x1b[0m`);
+  } else {
+    console.warn(`\x1b[33m▲ [Infrastructure] ${qdrantName} not reachable at ${ENV.QDRANT_URL}.\x1b[0m`);
   }
 }
 
@@ -107,8 +124,8 @@ async function main(): Promise<void> {
   console.log("\n" + "=".repeat(70));
   console.log("   🚀  INCIDENT NOTIFIER - AI SRE LOG MONITOR & ROOT CAUSE AGENT");
   console.log("=".repeat(70));
-  console.log(`📡 Loki URL:             ${ENV.LOKI_URL}`);
-  console.log(`🧠 Qdrant Vector Store:   ${ENV.QDRANT_URL} (Collection: ${ENV.QDRANT_COLLECTION})`);
+  console.log(`📡 Loki:                 ${ENV.IS_LOKI_CLOUD ? "Grafana Cloud Loki" : "Local Loki"} (${ENV.LOKI_URL})`);
+  console.log(`🧠 Qdrant:               ${ENV.IS_QDRANT_CLOUD ? "Qdrant Cloud" : "Local Qdrant"} (${ENV.QDRANT_URL} [${ENV.QDRANT_COLLECTION}])`);
   console.log(`🤖 LLM Model:            ${ENV.GEMINI_MODEL}`);
   console.log(`⏱️  Poll Interval:        ${ENV.POLL_INTERVAL_MS}ms`);
   console.log(`🛡️  Deduplication Window: ${ENV.DEDUP_WINDOW_MS / 1000}s`);

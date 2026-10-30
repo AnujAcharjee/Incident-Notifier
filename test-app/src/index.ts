@@ -66,8 +66,14 @@ const server = Bun.serve({
   },
 });
 
+const targetUrl = process.env.LOKI_URL || "http://localhost:3100";
+const isCloudLoki = Boolean(
+  (process.env.LOKI_URL && process.env.LOKI_URL.includes("grafana.net")) ||
+  process.env.LOKI_USERNAME
+);
+
 console.log(`\n🚀 [Test App] Running on http://localhost:${server.port}`);
-console.log(`📡 [Test App] Pushing logs to Loki at ${process.env.LOKI_URL || "http://localhost:3100"}`);
+console.log(`📡 [Test App] Pushing logs to ${isCloudLoki ? "Grafana Cloud Loki" : "Loki"} at ${targetUrl}`);
 console.log(`⚡ [Test App] Manual triggers available: POST http://localhost:${server.port}/simulate/<scenario>\n`);
 
 // Background automated traffic simulation

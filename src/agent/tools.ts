@@ -66,7 +66,7 @@ export const fetchContextLogsTool = tool(
   }
 );
 
-export const toolsByName = {
+export const toolsByName: Record<string, any> = {
   [searchRunbooksTool.name]: searchRunbooksTool,
   [fetchContextLogsTool.name]: fetchContextLogsTool,
 };

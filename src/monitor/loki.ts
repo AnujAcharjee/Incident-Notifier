@@ -28,18 +28,38 @@ export interface LokiQueryResponse {
 
 export class LokiClient {
   private baseUrl: string;
+  private authHeader?: string;
 
-  constructor(baseUrl = ENV.LOKI_URL) {
+  constructor(baseUrl = ENV.LOKI_URL, authHeader = ENV.LOKI_AUTH_HEADER) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
+    this.authHeader = authHeader;
+  }
+
+  /**
+   * Helper to build standard request headers including Basic Auth if configured.
+   */
+  private getHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {};
+    if (this.authHeader) {
+      headers["Authorization"] = this.authHeader;
+    }
+    return headers;
   }
 
   /**
    * Checks if Loki is available and ready to accept/serve queries.
    */
   async isReady(): Promise<boolean> {
+    const headers = this.getHeaders();
     try {
-      const res = await fetch(`${this.baseUrl}/ready`);
-      return res.status === 200;
+      // 1. Try standard /ready endpoint (used by local Loki instances)
+      const res = await fetch(`${this.baseUrl}/ready`, { headers });
+      if (res.status === 200) return true;
+
+      // 2. Grafana Cloud Loki / proxies may disallow /ready or return 401/404.
+      // Check /loki/api/v1/labels which returns 200 on authenticated cloud instances
+      const labelsRes = await fetch(`${this.baseUrl}/loki/api/v1/labels`, { headers });
+      return labelsRes.status === 200;
     } catch {
       return false;
     }
@@ -108,7 +128,7 @@ export class LokiClient {
   private async executeQuery(params: URLSearchParams): Promise<LokiLogEntry[]> {
     try {
       const url = `${this.baseUrl}/loki/api/v1/query_range?${params.toString()}`;
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: this.getHeaders() });
 
       if (!res.ok) {
         console.warn(`[LokiClient] Query failed (${res.status} ${res.statusText})`);

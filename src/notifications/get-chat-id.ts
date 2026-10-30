@@ -41,7 +41,12 @@ async function getChatId() {
     }
 
     // Get the most recent user
-    const lastMsg = directMessages[directMessages.length - 1].message!;
+    const lastUpdate = directMessages[directMessages.length - 1];
+    const lastMsg = lastUpdate?.message;
+    if (!lastMsg) {
+      console.log("\x1b[33m⚠️ No direct messages detected yet.\x1b[0m");
+      return;
+    }
     const user = lastMsg.chat;
 
     console.log("\n\x1b[32m✔ Found user contact!\x1b[0m");

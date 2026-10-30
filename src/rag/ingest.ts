@@ -73,7 +73,7 @@ export async function ingestDocuments(
     });
 
     const chunks = await splitter.splitDocuments(allDocs);
-    console.log(`[RAG] Split into ${chunks.length} chunks. Generating embeddings and storing in Qdrant...`);
+    console.log(`[RAG] Split into ${chunks.length} chunks. Generating embeddings and storing in ${ENV.IS_QDRANT_CLOUD ? "Qdrant Cloud" : "Qdrant"} (${ENV.QDRANT_URL})...`);
 
     const store = getVectorStore(collectionName);
     await store.addDocuments(chunks);
