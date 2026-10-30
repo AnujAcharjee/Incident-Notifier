@@ -6,21 +6,7 @@ An autonomous AI Site Reliability Engineering (SRE) agent that monitors applicat
 
 ## 🏗️ Architecture
 
-```
-Application Logs (test-app) 
-        ↓
-   Grafana Loki (Port 3100)
-        ↓
-  Incident Notifier (Loki Poller + Deduplication)
-        ↓
- LangGraph SRE Agent (Gemini)
-    ├── Tool 1: fetch_context_logs (Loki Query Range by traceId / service)
-    └── Tool 2: search_runbooks (Qdrant Vector RAG / docs)
-        ↓
- Zod Output Validation (Facts vs Hypotheses)
-        ↓
- Terminal Incident Report & Optional Telegram Notification
-```
+![Incident Notifier Architecture](docs/architecture.png)
 
 ---
 
@@ -43,7 +29,7 @@ docker ps
 ---
 
 ### Step 2: Ingest Knowledge Base Runbooks
-Load the architectural specifications and runbooks from `./docs` into Qdrant:
+Load the architectural specifications and runbooks from `./ingest-docs` into Qdrant:
 
 ```bash
 bun run ingest
@@ -51,7 +37,7 @@ bun run ingest
 
 You should see:
 ```text
-[RAG] Loaded 5 documents from local directory "./docs".
+[RAG] Loaded 5 documents from local directory "./ingest-docs".
 [RAG] Successfully ingested 11 chunks into Qdrant collection "incident-knowledge".
 ```
 
