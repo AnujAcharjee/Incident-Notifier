@@ -4,6 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "build": "bun build src/api/cron.ts --outfile api/cron.js --target node",
+    "vercel-build": "bun build src/api/cron.ts --outfile api/cron.js --target node",
     "start": "bun run src/index.ts",
     "ingest": "bun run src/rag/ingest.ts",
     "test-app": "bun run test-app/src/index.ts",
