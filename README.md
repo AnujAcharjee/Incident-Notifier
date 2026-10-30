@@ -1,6 +1,6 @@
 # Incident Notifier
 
-An autonomous AI Site Reliability Engineering (SRE) agent that monitors application logs in Grafana Loki, detects errors, investigates their likely root causes using log context and internal runbooks (via Qdrant Vector RAG), and generates evidence-backed incident reports directly to your terminal.
+An autonomous AI Site Reliability Engineering (SRE) agent that monitors application logs in Grafana Loki, detects errors, investigates their likely root causes using log context and internal runbooks (via Qdrant Vector RAG), and generates evidence-backed incident reports directly to your Telegram bot (and terminal).
 
 ---
 
