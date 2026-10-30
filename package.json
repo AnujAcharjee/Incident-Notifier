@@ -1,5 +1,7 @@
 {
   "name": "incident_notifier",
+  "version": "1.0.0",
+  "license": "MIT",
   "module": "src/index.ts",
   "type": "module",
   "private": true,

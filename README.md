@@ -1,5 +1,14 @@
 # Incident Notifier
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Bun](https://img.shields.io/badge/Bun-1.3+-000?logo=bun&logoColor=white)](https://bun.sh)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![LangGraph](https://img.shields.io/badge/Agent-LangGraph.js-purple)](https://langchain.com)
+[![Gemini](https://img.shields.io/badge/LLM-Google%20Gemini-orange?logo=google)](https://ai.google.dev)
+[![Qdrant](https://img.shields.io/badge/Vector%20DB-Qdrant%20Cloud-red?logo=qdrant)](https://qdrant.tech)
+[![Loki](https://img.shields.io/badge/Logs-Grafana%20Loki-F46800?logo=grafana)](https://grafana.com/oss/loki/)
+[![Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?logo=vercel)](https://incident-notifier.vercel.app)
+
 An autonomous AI Site Reliability Engineering (SRE) agent that monitors application logs in Grafana Loki, detects errors, investigates their likely root causes using log context and internal runbooks (via Qdrant Vector RAG), and generates evidence-backed incident reports directly to your Telegram bot.
 
 ![Incident Notifier Architecture](architecture.png)
@@ -166,3 +175,9 @@ Incident Notifier will autonomously detect errors from your application, query y
      ```bash
      bun run test:telegram
      ```
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
