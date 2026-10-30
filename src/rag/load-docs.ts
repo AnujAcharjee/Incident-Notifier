@@ -45,7 +45,7 @@ export async function loadLocalFile(filePath: string): Promise<Document> {
 /**
  * Recursively scans a directory and loads all supported runbook/architecture documentation files.
  *
- * @param dirPath - Directory path (default: ./ingest-docs)
+ * @param dirPath - Directory path (default: ./ingest-files)
  * @param options - Custom extension filter and recursion flags
  */
 export async function loadLocalDirectory(

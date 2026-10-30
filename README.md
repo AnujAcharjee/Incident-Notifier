@@ -1,10 +1,6 @@
 # Incident Notifier
 
-An autonomous AI Site Reliability Engineering (SRE) agent that monitors application logs in Grafana Loki, detects errors, investigates their likely root causes using log context and internal runbooks (via Qdrant Vector RAG), and generates evidence-backed incident reports directly to your Telegram bot (and terminal).
-
----
-
-## 🏗️ Architecture
+An autonomous AI Site Reliability Engineering (SRE) agent that monitors application logs in Grafana Loki, detects errors, investigates their likely root causes using log context and internal runbooks (via Qdrant Vector RAG), and generates evidence-backed incident reports directly to your Telegram bot.
 
 ![Incident Notifier Architecture](docs/architecture.png)
 
@@ -31,11 +27,11 @@ docker ps
 ### Step 2: Ingest Knowledge Base Runbooks
 
 > [!IMPORTANT]
-> **Demo Files Notice:** The pre-included files in `./ingest-docs` (`database-config.md`, `payment-service-api.md`, `redis-cache-config.md`, etc.) are mock runbooks created **strictly for testing the sample `test-app`**.
+> **Demo Files Notice:** The pre-included files in `./ingest-files` (`database-config.md`, `payment-service-api.md`, `redis-cache-config.md`, etc.) are mock runbooks created **strictly for testing the sample `test-app`**.
 >
 > **To monitor your own real-world application:**
-> 1. **Remove the demo files** from `./ingest-docs/`.
-> 2. **Add your own application's documentation** into `./ingest-docs/` (architecture specs, database connection pool guides, third-party API timeout policies, error code catalogs, and SRE recovery procedures in `.md` or `.txt`).
+> 1. **Remove the demo files** from `./ingest-files/`.
+> 2. **Add your own application's documentation** into `./ingest-files/` (architecture specs, database connection pool guides, third-party API timeout policies, error code catalogs, and SRE recovery procedures in `.md` or `.txt`).
 > 3. **Run the ingestion script** to chunk and embed your runbooks into Qdrant Vector DB:
 
 ```bash
@@ -44,7 +40,7 @@ bun run ingest
 
 You should see:
 ```text
-[RAG] Loaded X documents from local directory "./ingest-docs".
+[RAG] Loaded X documents from local directory "./ingest-files".
 [RAG] Successfully ingested Y chunks into Qdrant collection "incident-knowledge".
 ```
 
@@ -95,13 +91,13 @@ curl -X POST http://localhost:4000/simulate/auth-spike
 Follow these steps to connect Incident Notifier to your own microservices or production systems:
 
 ### 1. Remove Demo Runbooks & Add Your App Docs
-The files currently in `./ingest-docs/` are mock runbooks for the test suite. Clean them out and place your own documentation in `./ingest-docs/`:
+The files currently in `./ingest-files/` are mock runbooks for the test suite. Clean them out and place your own documentation in `./ingest-files/`:
 ```bash
 # Clean out test-app demo runbooks
-rm ingest-docs/*.md
+rm ingest-files/*.md
 
 # Add your service documentation, architecture specs, and runbooks
-cp /path/to/your-app-docs/*.md ./ingest-docs/
+cp /path/to/your-app-docs/*.md ./ingest-files/
 ```
 Include:
 - System overview, database connection pool limits, third-party API timeout thresholds.
