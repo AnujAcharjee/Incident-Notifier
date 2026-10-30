@@ -29,7 +29,14 @@ docker ps
 ---
 
 ### Step 2: Ingest Knowledge Base Runbooks
-Load the architectural specifications and runbooks from `./ingest-docs` into Qdrant:
+
+> [!IMPORTANT]
+> **Demo Files Notice:** The pre-included files in `./ingest-docs` (`database-config.md`, `payment-service-api.md`, `redis-cache-config.md`, etc.) are mock runbooks created **strictly for testing the sample `test-app`**.
+>
+> **To monitor your own real-world application:**
+> 1. **Remove the demo files** from `./ingest-docs/`.
+> 2. **Add your own application's documentation** into `./ingest-docs/` (architecture specs, database connection pool guides, third-party API timeout policies, error code catalogs, and SRE recovery procedures in `.md` or `.txt`).
+> 3. **Run the ingestion script** to chunk and embed your runbooks into Qdrant Vector DB:
 
 ```bash
 bun run ingest
@@ -37,8 +44,8 @@ bun run ingest
 
 You should see:
 ```text
-[RAG] Loaded 5 documents from local directory "./ingest-docs".
-[RAG] Successfully ingested 11 chunks into Qdrant collection "incident-knowledge".
+[RAG] Loaded X documents from local directory "./ingest-docs".
+[RAG] Successfully ingested Y chunks into Qdrant collection "incident-knowledge".
 ```
 
 ---
@@ -80,6 +87,42 @@ curl -X POST http://localhost:4000/simulate/rate-limit
 # User Auth 401 Spike
 curl -X POST http://localhost:4000/simulate/auth-spike
 ```
+
+---
+
+## 🔌 Monitoring Your Own Application
+
+Follow these steps to connect Incident Notifier to your own microservices or production systems:
+
+### 1. Remove Demo Runbooks & Add Your App Docs
+The files currently in `./ingest-docs/` are mock runbooks for the test suite. Clean them out and place your own documentation in `./ingest-docs/`:
+```bash
+# Clean out test-app demo runbooks
+rm ingest-docs/*.md
+
+# Add your service documentation, architecture specs, and runbooks
+cp /path/to/your-app-docs/*.md ./ingest-docs/
+```
+Include:
+- System overview, database connection pool limits, third-party API timeout thresholds.
+- Known error codes, runbook recovery checklists, on-call instructions.
+
+### 2. Embed into Qdrant Vector DB
+Re-run the ingestion pipeline to chunk and store your app's runbooks:
+```bash
+bun run ingest
+```
+
+### 3. Stream Your Logs to Grafana Loki
+Ensure your application sends logs to Grafana Loki (or your self-hosted Loki instance) formatted with structured metadata:
+- Recommended labels: `service`, `level` (`info`, `warn`, `error`), and `traceId`.
+- Configure your Loki credentials (`LOKI_URL`, `LOKI_USERNAME`, `LOKI_PASSWORD`) in `.env`.
+
+### 4. Deploy or Run Locally
+- **Local Monitoring Loop:** `bun run start` (continuously polls Loki and investigates novel errors).
+- **Vercel Serverless Function:** Deploy via `vercel --prod` and invoke `/api/cron` periodically using Vercel Cron or an external ping.
+
+Incident Notifier will autonomously detect errors from your application, query your specific runbooks via RAG, formulate verified facts vs hypotheses, and notify your on-call engineers on Telegram!
 
 ---
 
