@@ -3,12 +3,7 @@
   "crons": [
     {
       "path": "/api/hello",
-      "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/cron",
-      "schedule": "*/10 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
-
