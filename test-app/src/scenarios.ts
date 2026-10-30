@@ -1,3 +1,14 @@
+/**
+ * @file test-app/src/scenarios.ts
+ * @description Simulated microservice telemetry scenarios mirroring production outage topologies.
+ * Models normal happy-path traffic alongside real-world failure patterns:
+ * - PostgreSQL TCP connection refusal (ECONNREFUSED)
+ * - Stripe Payment Gateway HTTP 504 timeouts
+ * - Redis cluster latency spikes and command timeouts (ETIMEDOUT)
+ * - Outbound webhook rate-limit throttling (HTTP 429)
+ * - Authentication JWT expiration bursts (HTTP 401)
+ */
+
 import { logger } from "./logger";
 
 export const ERROR_CODES = {
@@ -9,7 +20,9 @@ export const ERROR_CODES = {
 } as const;
 
 export const scenarios = {
-  // 1. Database operation (normal vs connection refusal)
+  /**
+   * Database operation: simulates PostgreSQL pool operations vs down cluster connection refused.
+   */
   simulateDatabaseQuery(forceError = false): void {
     const service = "postgres-db";
     const traceId = "tr-db-" + Math.random().toString(36).substring(2, 8);
@@ -39,7 +52,9 @@ export const scenarios = {
     }
   },
 
-  // 2. Payment Gateway charge (normal vs 504 Gateway Timeout)
+  /**
+   * Payment gateway: simulates Stripe authorization vs external 504 gateway timeout.
+   */
   simulatePaymentGateway(forceError = false): void {
     const service = "payment-service";
     const traceId = "tr-pay-" + Math.random().toString(36).substring(2, 8);
@@ -68,7 +83,9 @@ export const scenarios = {
     }
   },
 
-  // 3. Redis Cache read/write (normal vs timeout)
+  /**
+   * In-memory cache: simulates Redis cluster cache hits vs socket timeout.
+   */
   simulateCacheOperation(forceError = false): void {
     const service = "redis-cache";
     const traceId = "tr-cache-" + Math.random().toString(36).substring(2, 8);
@@ -96,7 +113,9 @@ export const scenarios = {
     }
   },
 
-  // 4. Outbound API Notification (normal vs 429 rate limit)
+  /**
+   * Outbound notification worker: simulates webhook deliveries vs HTTP 429 quota exhaustion.
+   */
   simulateOutboundNotification(forceError = false): void {
     const service = "notification-worker";
     const traceId = "tr-notif-" + Math.random().toString(36).substring(2, 8);
@@ -124,7 +143,9 @@ export const scenarios = {
     }
   },
 
-  // 5. User Auth (normal vs invalid token burst)
+  /**
+   * Authentication service: simulates token issuance vs signature failure warnings.
+   */
   simulateUserAuth(forceError = false): void {
     const service = "auth-service";
     const traceId = "tr-auth-" + Math.random().toString(36).substring(2, 8);

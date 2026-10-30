@@ -1,9 +1,21 @@
+/**
+ * @file src/agent/tools.ts
+ * @description LangChain tool definitions exposed to the investigative agent.
+ * Provides two primary sensory modalities:
+ * 1. searchRunbooksTool: RAG retriever querying Qdrant for architectural specs and recovery procedures.
+ * 2. fetchContextLogsTool: Temporal and traceId query engine querying Grafana Loki for correlated telemetry.
+ */
+
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { model } from "./model";
 import { getFormattedKnowledgeContext } from "../rag/retriever";
 import { lokiClient } from "../monitor/loki";
 
+/**
+ * Semantic vector search tool connecting the agent to Qdrant.
+ * Retrieves top-k matching runbook chunks to inform diagnosis and remediation steps.
+ */
 export const searchRunbooksTool = tool(
   async ({ query }: { query: string }) => {
     try {
@@ -23,6 +35,10 @@ export const searchRunbooksTool = tool(
   }
 );
 
+/**
+ * Log context extraction tool connecting the agent to Grafana Loki.
+ * Fetches correlated logs matching service name and traceId to reconstruct timeline leading up to failure.
+ */
 export const fetchContextLogsTool = tool(
   async ({
     service,
@@ -72,4 +88,8 @@ export const toolsByName: Record<string, any> = {
 };
 
 export const tools = [searchRunbooksTool, fetchContextLogsTool];
+
+/**
+ * Model instance bound with tool schemas for function calling.
+ */
 export const modelWithTools = model.bindTools(tools);

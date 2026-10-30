@@ -1,3 +1,10 @@
+/**
+ * @file test-app/src/loki.ts
+ * @description Asynchronous batch log shipper buffering and pushing telemetry to Grafana Loki.
+ * Implements micro-batching with timer-based flushes, immediate error priority flushing,
+ * multi-stream grouping by indexed label sets, and HTTP Basic Auth for Grafana Cloud.
+ */
+
 export interface LogEntry {
   level: "info" | "warn" | "error";
   service: string;
@@ -8,6 +15,9 @@ export interface LogEntry {
   timestamp?: string;
 }
 
+/**
+ * Loki Pusher buffering logs and delivering them to /loki/api/v1/push.
+ */
 export class LokiPusher {
   private lokiUrl: string;
   private authHeader?: string;
@@ -38,12 +48,14 @@ export class LokiPusher {
     this.startAutoFlush();
   }
 
+  /**
+   * Enqueues a log entry with nanosecond timestamp.
+   * Flushes immediately when an error is logged or queue exceeds 10 items.
+   */
   public push(entry: LogEntry): void {
-    // Loki expects timestamps in nanoseconds as strings
     const nowNano = (BigInt(Date.now()) * 1_000_000n).toString();
     this.queue.push({ entry, timeNano: nowNano });
 
-    // Flush immediately for errors, or wait for timer
     if (entry.level === "error" || this.queue.length >= 10) {
       this.flush();
     }
@@ -58,6 +70,9 @@ export class LokiPusher {
     }, 2000);
   }
 
+  /**
+   * Flushes buffered logs to Loki in a single atomic batch grouped by stream labels.
+   */
   public async flush(): Promise<void> {
     if (this.queue.length === 0) return;
 

@@ -1,11 +1,19 @@
+/**
+ * @file test-app/src/index.ts
+ * @description Simulated e-commerce microservices workload and HTTP fault-injection server.
+ * Runs background traffic simulation (90% steady-state, 10% fault injection) alongside
+ * on-demand HTTP endpoints to trigger deterministic errors for end-to-end agent testing.
+ */
+
 import { scenarios, ERROR_CODES } from "./scenarios";
-import { logger } from "./logger";
 
 const PORT = Number(process.env.TEST_APP_PORT) || 4000;
 let totalLogsCount = 0;
 let totalErrorsCount = 0;
 
-// HTTP Server for manual triggers
+/**
+ * Fault injection HTTP server exposing manual error trigger endpoints.
+ */
 const server = Bun.serve({
   port: PORT,
   async fetch(req) {
@@ -76,7 +84,7 @@ console.log(`\n🚀 [Test App] Running on http://localhost:${server.port}`);
 console.log(`📡 [Test App] Pushing logs to ${isCloudLoki ? "Grafana Cloud Loki" : "Loki"} at ${targetUrl}`);
 console.log(`⚡ [Test App] Manual triggers available: POST http://localhost:${server.port}/simulate/<scenario>\n`);
 
-// Background automated traffic simulation
+// Background automated traffic simulation with stochastic error distribution
 const trafficTimer = setInterval(() => {
   const roll = Math.random();
   totalLogsCount++;

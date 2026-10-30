@@ -1,3 +1,10 @@
+/**
+ * @file test-app/src/logger.ts
+ * @description Structured application logger formatting log events with trace IDs.
+ * Concurrently outputs colored ANSI lines to stdout and forwards typed events to LokiPusher
+ * for batch ingestion into Grafana Loki.
+ */
+
 import { lokiPusher, type LogEntry } from "./loki";
 
 export interface LogPayload {
@@ -8,6 +15,9 @@ export interface LogPayload {
   metadata?: Record<string, any>;
 }
 
+/**
+ * Generates an 8-character pseudo-random distributed trace identifier.
+ */
 function generateTraceId(): string {
   return "tr-" + Math.random().toString(36).substring(2, 10);
 }

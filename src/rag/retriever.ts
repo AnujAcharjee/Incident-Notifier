@@ -1,3 +1,10 @@
+/**
+ * @file src/rag/retriever.ts
+ * @description Similarity search retrieval engine querying Qdrant knowledge bases.
+ * Converts unstructured incident queries into dense vector queries, ranks matching
+ * runbook chunks by similarity score, and formats the output into markdown context for LLM prompts.
+ */
+
 import { Document } from "@langchain/core/documents";
 import { getVectorStore } from "./qdrant";
 import { ENV } from "../config";
@@ -14,7 +21,11 @@ export interface SearchResult {
 }
 
 /**
- * Searches the Qdrant vector database for documents relevant to an incident or error query.
+ * Searches the Qdrant vector database for runbooks matching an error signature.
+ *
+ * @param query - Free-text search query (e.g. 'postgres ECONNREFUSED' or 'Redis timeout')
+ * @param options - Similarity search parameters including top-k and metadata filters
+ * @returns Array of matching documents paired with cosine similarity relevance scores
  */
 export async function searchIncidentKnowledge(
   query: string,
@@ -33,7 +44,11 @@ export async function searchIncidentKnowledge(
 }
 
 /**
- * Convenience helper that searches knowledge base and formats results as readable markdown context for LLMs.
+ * Convenience helper formatting top-k runbook matches into clean Markdown
+ * ready for direct injection into LangGraph LLM system prompts or tool returns.
+ *
+ * @param query - Free-text error description
+ * @param k - Number of highest-ranked chunks to return
  */
 export async function getFormattedKnowledgeContext(
   query: string,

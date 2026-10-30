@@ -1,3 +1,12 @@
+/**
+ * @file src/index.ts
+ * @description Main daemon entry point for the Incident Notifier service.
+ * Runs an asynchronous polling loop against Grafana Loki to capture error streams,
+ * tracks a strictly monotonic high-watermark timestamp, applies sliding-window
+ * fingerprint deduplication to avoid alert storms, and triggers autonomous LangGraph
+ * incident investigations with Telegram dispatch.
+ */
+
 import { ENV } from "./config";
 import { lokiClient, errorDeduplicator, type LokiLogEntry } from "./monitor/loki";
 import { runIncidentInvestigation } from "./agent/graph";
@@ -6,15 +15,21 @@ import { notifyIncident } from "./notifications/telegram";
 let isRunning = true;
 let isInvestigating = false;
 let lastInvestigationTime = 0;
+
+// High-watermark timestamp in nanoseconds. Initialized to 30 seconds in the past to catch startup stragglers.
 let lastSeenNano: string = (BigInt(Date.now() - 30 * 1000) * 1_000_000n).toString();
 
-let stats = {
+const stats = {
   polledCount: 0,
   errorsDetected: 0,
   incidentsReported: 0,
   duplicatesSuppressed: 0,
 };
 
+/**
+ * Validates upstream infrastructure connectivity (Loki & Qdrant) before opening poll cycles.
+ * Distinguishes between cloud-hosted and local endpoints for precise error reporting.
+ */
 async function checkInfrastructure(): Promise<void> {
   const lokiReady = await lokiClient.isReady();
   const lokiName = ENV.IS_LOKI_CLOUD ? "Grafana Cloud Loki" : "Loki";
@@ -37,6 +52,7 @@ async function checkInfrastructure(): Promise<void> {
     if (qdrantRes.ok) qdrantOnline = true;
   } catch {}
 
+  // Qdrant Cloud proxies may gate /readyz; verify via collections endpoint as secondary probe
   if (!qdrantOnline) {
     try {
       const collectionsRes = await fetch(`${ENV.QDRANT_URL}/collections`, { headers: qdrantHeaders });
@@ -52,10 +68,19 @@ async function checkInfrastructure(): Promise<void> {
   }
 }
 
+/**
+ * Core monitoring poll cycle.
+ * Executes on a recurring interval:
+ * 1. Queries Loki for errors newer than the current high-watermark timestamp.
+ * 2. Advances the high-watermark forward by 1 nanosecond past the latest processed log.
+ * 3. Deduplicates errors by (service + errorCode) within the sliding time window.
+ * 4. Enforces an investigation cooldown to prevent rate limit exhaustion on LLM providers.
+ * 5. Dispatches incident investigation and sends notifications.
+ */
 async function monitorPollCycle(): Promise<void> {
   stats.polledCount++;
 
-  // Periodic deduplication cleanup
+  // Evict expired entries from memory every 50 cycles to prevent memory creep
   if (stats.polledCount % 50 === 0) {
     errorDeduplicator.cleanup();
   }
@@ -68,7 +93,7 @@ async function monitorPollCycle(): Promise<void> {
     }
 
     for (const errorLog of errors) {
-      // Update high-watermark timestamp
+      // Advance monotonic high-watermark timestamp
       if (BigInt(errorLog.timeNano) > BigInt(lastSeenNano)) {
         lastSeenNano = (BigInt(errorLog.timeNano) + 1n).toString();
       }
@@ -88,7 +113,7 @@ async function monitorPollCycle(): Promise<void> {
         continue;
       }
 
-      // Check API cooldown to prevent rate limit exhaustion during traffic spikes
+      // Safeguard against API quota exhaustion during cascading outage bursts
       const timeSinceLast = Date.now() - lastInvestigationTime;
       if (timeSinceLast < ENV.INVESTIGATION_COOLDOWN_MS) {
         const waitSec = Math.ceil((ENV.INVESTIGATION_COOLDOWN_MS - timeSinceLast) / 1000);
@@ -120,6 +145,10 @@ async function monitorPollCycle(): Promise<void> {
   }
 }
 
+/**
+ * Service bootstrap: validates configuration, initiates infrastructure health check,
+ * and attaches SIGINT/SIGTERM handlers for graceful draining and summary reporting.
+ */
 async function main(): Promise<void> {
   console.log("\n" + "=".repeat(70));
   console.log("   🚀  INCIDENT NOTIFIER - AI SRE LOG MONITOR & ROOT CAUSE AGENT");
@@ -137,14 +166,14 @@ async function main(): Promise<void> {
   console.log(`\n\x1b[32m[Monitor] Listening for incoming application logs and errors...\x1b[0m`);
   console.log(`\x1b[90mTip: Run 'bun run test-app' in another terminal to generate simulated traffic.\x1b[0m\n`);
 
-  // Monitor polling loop
+  // Recurring polling ticker with concurrency lock to prevent overlapping runs during active investigation
   const interval = setInterval(async () => {
     if (!isRunning) return;
-    if (isInvestigating) return; // Prevent overlapping runs while agent is investigating
+    if (isInvestigating) return;
     await monitorPollCycle();
   }, ENV.POLL_INTERVAL_MS);
 
-  // Graceful shutdown handling
+  // Graceful shutdown handling with session metrics telemetry
   const shutdown = () => {
     if (!isRunning) return;
     isRunning = false;

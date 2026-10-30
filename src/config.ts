@@ -1,3 +1,11 @@
+/**
+ * @file src/config.ts
+ * @description Centralized environment configuration and validation engine.
+ * Enforces fail-fast startup semantics using Zod schema parsing, derives authenticated
+ * connection metadata for cloud providers (Grafana Cloud Loki & Qdrant Cloud),
+ * and normalizes URL path structures to prevent downstream routing defects.
+ */
+
 import 'dotenv/config';
 import { z } from 'zod';
 
@@ -27,17 +35,18 @@ const envSchema = z.object({
 
 const parsed = envSchema.parse(process.env);
 
-// Normalize Qdrant URL
+// Normalization strips trailing slashes to guarantee clean endpoint concatenation
 const normalizedQdrantUrl = parsed.QDRANT_URL.trim().replace(/\/+$/, "");
 
-// Normalize Loki URL (strips trailing /loki/api/v1/push or /loki/api/v1 if pasted from Grafana Cloud)
+// Grafana Cloud dashboard often exports push URLs ending in '/loki/api/v1/push'.
+// Strip these subpaths so the base URL can resolve both query and push endpoints.
 const normalizedLokiUrl = parsed.LOKI_URL
   .trim()
   .replace(/\/+$/, "")
   .replace(/\/loki\/api\/v1(\/push)?\/?$/, "")
   .replace(/\/+$/, "");
 
-// Generate Basic Auth header if credentials are provided (for Grafana Cloud / protected Loki)
+// Grafana Cloud Loki requires HTTP Basic Auth with Instance ID as username and Access Token as password
 const lokiUsername = (parsed.LOKI_USERNAME || "").trim();
 const lokiPassword = (parsed.LOKI_PASSWORD || "").trim();
 let lokiAuthHeader: string | undefined = undefined;
@@ -55,6 +64,9 @@ const isQdrantCloud = Boolean(
   parsed.QDRANT_API_KEY || normalizedQdrantUrl.includes("qdrant.io")
 );
 
+/**
+ * Validated immutable application configuration object.
+ */
 export const ENV = {
   ...parsed,
   QDRANT_URL: normalizedQdrantUrl,

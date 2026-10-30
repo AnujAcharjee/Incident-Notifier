@@ -1,5 +1,12 @@
+/**
+ * @file src/rag/load-docs.ts
+ * @description Document loaders for local runbooks and remote operational documentation.
+ * Parses Markdown, JSON, and plaintext files from the local filesystem or remote HTTP endpoints,
+ * generating normalized LangChain Document instances equipped with file path and MIME metadata.
+ */
+
 import { Document } from "@langchain/core/documents";
-import { readdir, stat } from "node:fs/promises";
+import { readdir } from "node:fs/promises";
 import { join, extname, basename } from "node:path";
 
 export interface LoadDirectoryOptions {
@@ -9,6 +16,9 @@ export interface LoadDirectoryOptions {
 
 /**
  * Loads a single local file (.md, .txt, .json) into a LangChain Document.
+ *
+ * @param filePath - Path to file on local disk
+ * @throws Error if file does not exist
  */
 export async function loadLocalFile(filePath: string): Promise<Document> {
   const file = Bun.file(filePath);
@@ -33,7 +43,10 @@ export async function loadLocalFile(filePath: string): Promise<Document> {
 }
 
 /**
- * Recursively scans a local directory and loads all matching documents.
+ * Recursively scans a directory and loads all supported runbook/architecture documentation files.
+ *
+ * @param dirPath - Directory path (default: ./docs)
+ * @param options - Custom extension filter and recursion flags
  */
 export async function loadLocalDirectory(
   dirPath: string,
@@ -68,7 +81,10 @@ export async function loadLocalDirectory(
 }
 
 /**
- * Fetches document content from a remote URL (HTTP/HTTPS, GitHub Raw, etc.).
+ * Ingests documentation from a remote URL (e.g. GitHub raw, Confluence API, internal wikis).
+ *
+ * @param url - HTTP/HTTPS URL
+ * @param extraMetadata - Optional custom metadata tags to append
  */
 export async function loadRemoteUrl(
   url: string,
@@ -94,18 +110,20 @@ export async function loadRemoteUrl(
 }
 
 /**
- * Fetches multiple remote URLs in parallel.
+ * Fetches multiple remote documentation URLs concurrently with fail-soft allSettled semantics.
+ *
+ * @param urls - Array of URLs to ingest
  */
 export async function loadRemoteUrls(urls: string[]): Promise<Document[]> {
   const results = await Promise.allSettled(urls.map((url) => loadRemoteUrl(url)));
   const docs: Document[] = [];
 
   for (let i = 0; i < results.length; i++) {
-    const res = results[i];
-    if (res && res.status === "fulfilled") {
+    const res = results[i]!;
+    if (res.status === "fulfilled") {
       docs.push(res.value);
-    } else if (res && res.status === "rejected") {
-      console.warn(`[Loader] Failed to fetch remote URL ${urls[i]}:`, res.reason);
+    } else {
+      console.warn(`[Loader] Failed to load remote URL "${urls[i]}":`, res.reason);
     }
   }
 

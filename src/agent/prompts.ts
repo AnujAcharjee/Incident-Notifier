@@ -1,3 +1,14 @@
+/**
+ * @file src/agent/prompts.ts
+ * @description System and structured synthesis prompts for the SRE incident investigation agent.
+ * Implements strict prompt safety guidelines (treating logs as untrusted data against prompt injection),
+ * enforces fact-versus-hypothesis separation, and guides structured JSON schema conformance.
+ */
+
+/**
+ * System prompt governing the multi-turn diagnostic reasoning loop.
+ * Directs the agent to invoke tools for Loki context correlation and Qdrant runbook search.
+ */
 export const INVESTIGATOR_SYSTEM_PROMPT = `You are an elite Site Reliability Engineering (SRE) AI agent responsible for autonomous incident root-cause analysis.
 
 YOUR MISSION:
@@ -16,6 +27,10 @@ CORE PRINCIPLES:
 
 After you have completed your investigation, synthesize your findings and prepare the final incident report.`;
 
+/**
+ * Structured extraction prompt used during report synthesis to format the diagnosis
+ * into the strongly typed IncidentReport schema.
+ */
 export const REPORT_GENERATION_PROMPT = `Based on the incident investigation, generate the final structured Incident Report.
 
 Ensure the output conforms strictly to the IncidentReport schema:

@@ -1,8 +1,20 @@
+/**
+ * @file src/notifications/telegram.ts
+ * @description Multi-channel notification dispatcher and report formatter.
+ * Produces ANSI-colored terminal summaries for local developer observation and generates
+ * HTML-formatted messages dispatched via Telegram Bot API with payload size clamping
+ * (Telegram's 4096-character limit) and HTML entity escaping.
+ */
+
 import { ENV } from "../config";
 import type { IncidentReport } from "../agent/state";
 
 /**
- * Formats an incident report for terminal display with ANSI colors and clear sections.
+ * Formats an incident report for ANSI terminal output with clear visual section boundaries.
+ *
+ * @param report - Structured incident report emitted by the LangGraph agent
+ * @param occurrences - Count of duplicate occurrences suppressed during the current deduplication window
+ * @returns ANSI formatted terminal string
  */
 export function formatTerminalReport(report: IncidentReport, occurrences = 1): string {
   const reset = "\x1b[0m";
@@ -88,7 +100,11 @@ export function formatTerminalReport(report: IncidentReport, occurrences = 1): s
 }
 
 /**
- * Formats an incident report for HTML Telegram messages.
+ * Formats an incident report as Telegram-compatible HTML with escaping for reserved characters.
+ *
+ * @param report - Structured incident report
+ * @param occurrences - Repeat error occurrence count
+ * @returns HTML string formatted for Telegram sendMessage
  */
 export function formatTelegramHtml(report: IncidentReport, occurrences = 1): string {
   const icon =
@@ -140,14 +156,17 @@ export function formatTelegramHtml(report: IncidentReport, occurrences = 1): str
 }
 
 /**
- * Dispatches incident notification to terminal output, and optionally to Telegram if configured.
+ * Dispatches incident reports:
+ * 1. Outputs ANSI summary to stdout.
+ * 2. If TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are populated, posts an alert via Telegram Bot API.
+ *
+ * @param report - Incident report to dispatch
+ * @param occurrences - Repeat error counter
  */
 export async function notifyIncident(report: IncidentReport, occurrences = 1): Promise<void> {
-  // Always output to terminal with rich formatting
   const terminalOutput = formatTerminalReport(report, occurrences);
   console.log(terminalOutput);
 
-  // Check if Telegram credentials are valid and configured
   const token = ENV.TELEGRAM_BOT_TOKEN;
   const chatId = ENV.TELEGRAM_CHAT_ID;
 
@@ -164,9 +183,9 @@ export async function notifyIncident(report: IncidentReport, occurrences = 1): P
     return;
   }
 
-  // If credentials are present, attempt Telegram dispatch
   try {
     let text = formatTelegramHtml(report, occurrences);
+    // Enforce Telegram's 4096 character message limit
     if (text.length > 4000) {
       text = text.slice(0, 3950) + "\n\n<i>[Content truncated due to Telegram size limit]</i>";
     }

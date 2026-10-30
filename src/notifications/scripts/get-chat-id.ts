@@ -1,5 +1,15 @@
-import { ENV } from "../config";
+/**
+ * @file src/notifications/get-chat-id.ts
+ * @description Operational CLI utility discovering the developer's Telegram Chat ID.
+ * Polls the Telegram Bot API getUpdates endpoint, filters for private direct messages,
+ * and extracts the numeric chat identifier required for targeted alert delivery.
+ */
 
+import { ENV } from "../../config";
+
+/**
+ * Retrieves the most recent direct conversation with the configured Telegram bot.
+ */
 async function getChatId() {
   const token = ENV.TELEGRAM_BOT_TOKEN;
 
@@ -40,7 +50,6 @@ async function getChatId() {
       return;
     }
 
-    // Get the most recent user
     const lastUpdate = directMessages[directMessages.length - 1];
     const lastMsg = lastUpdate?.message;
     if (!lastMsg) {

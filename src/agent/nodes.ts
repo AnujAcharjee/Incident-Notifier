@@ -1,12 +1,23 @@
+/**
+ * @file src/agent/nodes.ts
+ * @description LangGraph graph nodes and conditional transition routers.
+ * Encapsulates the core agent lifecycle:
+ * - investigateNode: Context assembly and multi-turn ReAct reasoning loop with tool selection.
+ * - toolsNode: Safe sandboxed execution of Loki/Qdrant tools with observation feedback.
+ * - generateReportNode: Enforces Zod schema compliance on report synthesis with circuit-breaker fallback.
+ * - shouldContinue: Edge router determining whether further tool invocations are needed.
+ */
+
 import { SystemMessage, HumanMessage, AIMessage, ToolMessage } from "@langchain/core/messages";
 import { toolsByName, modelWithTools } from "./tools";
 import { model } from "./model";
-import { AgentState, IncidentReportSchema, type AgentStateType } from "./state";
+import { IncidentReportSchema, type AgentStateType } from "./state";
 import { INVESTIGATOR_SYSTEM_PROMPT, REPORT_GENERATION_PROMPT } from "./prompts";
 
 /**
  * Node 1: Investigation Reasoning
- * The agent analyzes the error and decides whether to fetch logs or search runbooks.
+ * Initializes the conversation on the first iteration using raw error metadata.
+ * Prompts the model with tool definitions to formulate hypotheses and issue tool calls.
  */
 export async function investigateNode(state: AgentStateType) {
   const currentMessages = [...state.messages];
@@ -40,7 +51,9 @@ Investigate this failure. Fetch relevant context logs from Loki and search the r
 
 /**
  * Node 2: Tool Execution
- * Runs tool calls made by the LLM (Loki log queries or Qdrant runbook searches).
+ * Executes tool calls emitted by the reasoning node. Wraps execution in defensive try/catch
+ * blocks to prevent agent crash on transient network/provider failures and captures
+ * observations into state channels.
  */
 export async function toolsNode(state: AgentStateType) {
   const lastMessage = state.messages.at(-1);
@@ -93,7 +106,8 @@ export async function toolsNode(state: AgentStateType) {
 
 /**
  * Node 3: Structured Incident Report Generator
- * Uses Gemini structured output validated by Zod.
+ * Invokes Gemini with strict Zod structured output. Includes a deterministic fallback
+ * generator to guarantee downstream alert delivery even if the LLM output violates schema constraints.
  */
 export async function generateReportNode(state: AgentStateType) {
   const structuredModel = model.withStructuredOutput(IncidentReportSchema);
@@ -110,7 +124,7 @@ export async function generateReportNode(state: AgentStateType) {
     const report = await structuredModel.invoke(reportPrompt);
     return { report };
   } catch (error) {
-    // Graceful fallback with manual structure if validation encounters edge case
+    // Fail-safe circuit breaker: ensures on-call engineers always receive a notification
     console.warn("[Agent] Structured output parse warning, falling back:", (error as Error).message);
     const fallbackReport = {
       incidentId: `INC-${state.errorLog.service}-${Date.now().toString().slice(-6)}`,
@@ -139,7 +153,9 @@ export async function generateReportNode(state: AgentStateType) {
 }
 
 /**
- * Conditional router: checks if the agent wants to execute more tools or produce report
+ * Conditional Edge Router
+ * Inspects the latest AIMessage: if pending tool calls exist, branches to 'tools',
+ * otherwise transitions to 'generateReport'.
  */
 export function shouldContinue(state: AgentStateType): "tools" | "generateReport" {
   const lastMessage = state.messages.at(-1);

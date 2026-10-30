@@ -1,6 +1,13 @@
-import { ENV } from "../config";
-import { notifyIncident } from "./telegram";
-import type { IncidentReport } from "../agent/state";
+/**
+ * @file src/notifications/test-telegram.ts
+ * @description Integration diagnostic test verifying Telegram bot authentication and delivery.
+ * Probes the Telegram getMe endpoint to validate bot identity and dispatches a synthetic
+ * IncidentReport through notifyIncident to confirm end-to-end webhook delivery.
+ */
+
+import { ENV } from "../../config";
+import { notifyIncident } from "../telegram";
+import type { IncidentReport } from "../../agent/state";
 
 async function testTelegram() {
   console.log("\n📡 Testing Telegram Integration...");
@@ -17,7 +24,7 @@ async function testTelegram() {
     process.exit(1);
   }
 
-  // 1. Verify Bot Token via getMe
+  // 1. Verify Bot Token validity via getMe
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/getMe`);
     const data = (await res.json()) as { ok: boolean; result?: { username: string; first_name: string }; description?: string };
@@ -33,7 +40,7 @@ async function testTelegram() {
     process.exit(1);
   }
 
-  // 2. Dispatch a sample test incident report
+  // 2. Dispatch a sample test incident report to verify HTML formatting and chat reception
   console.log(`📤 Sending test alert DM to Telegram User (Chat ID: ${chatId})...`);
   const mockReport: IncidentReport = {
     incidentId: "INC-" + Math.floor(1000 + Math.random() * 9000),
@@ -59,10 +66,10 @@ async function testTelegram() {
   };
 
   await notifyIncident(mockReport, 1);
-  console.log("🎉 Test completed!\n");
+  console.log("✔ Test sequence completed successfully.\n");
 }
 
-testTelegram().catch((err) => {
-  console.error("Unexpected error:", err);
+testTelegram().catch((e) => {
+  console.error("Test execution failed:", e);
   process.exit(1);
 });

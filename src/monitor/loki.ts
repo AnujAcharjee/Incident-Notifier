@@ -1,5 +1,16 @@
+/**
+ * @file src/monitor/loki.ts
+ * @description Grafana Loki integration layer and in-memory error deduplication engine.
+ * Handles HTTP Basic Authentication for Grafana Cloud Loki, transforms Loki's matrix/stream
+ * nested response schema into flat structured log entries, and provides stable error fingerprinting
+ * to prevent alert fatigue during cascading failures.
+ */
+
 import { ENV } from "../config";
 
+/**
+ * Normalized log record extracted from Loki streams.
+ */
 export interface LokiLogEntry {
   timestamp: string;
   timeNano: string;
@@ -14,7 +25,7 @@ export interface LokiLogEntry {
 
 export interface LokiStreamResult {
   stream: Record<string, string>;
-  values: Array<[string, string]>;
+  values: Array<[string, string]>; // [unix_nano_string, line_content]
 }
 
 export interface LokiQueryResponse {
@@ -26,6 +37,9 @@ export interface LokiQueryResponse {
   error?: string;
 }
 
+/**
+ * Client for executing LogQL queries against Grafana Loki HTTP REST API.
+ */
 export class LokiClient {
   private baseUrl: string;
   private authHeader?: string;
@@ -36,7 +50,7 @@ export class LokiClient {
   }
 
   /**
-   * Helper to build standard request headers including Basic Auth if configured.
+   * Generates authorization headers when targeting authenticated Loki clusters.
    */
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = {};
@@ -47,17 +61,16 @@ export class LokiClient {
   }
 
   /**
-   * Checks if Loki is available and ready to accept/serve queries.
+   * Probes Loki readiness.
+   * Tries `/ready` first (standard on open-source local Loki), falling back to `/loki/api/v1/labels`
+   * with credentials (required on Grafana Cloud Loki where `/ready` is blocked by cloud gateways).
    */
   async isReady(): Promise<boolean> {
     const headers = this.getHeaders();
     try {
-      // 1. Try standard /ready endpoint (used by local Loki instances)
       const res = await fetch(`${this.baseUrl}/ready`, { headers });
       if (res.status === 200) return true;
 
-      // 2. Grafana Cloud Loki / proxies may disallow /ready or return 401/404.
-      // Check /loki/api/v1/labels which returns 200 on authenticated cloud instances
       const labelsRes = await fetch(`${this.baseUrl}/loki/api/v1/labels`, { headers });
       return labelsRes.status === 200;
     } catch {
@@ -66,7 +79,10 @@ export class LokiClient {
   }
 
   /**
-   * Queries Loki for recent error logs.
+   * Queries Loki for recent error-level logs within a given timestamp boundary.
+   *
+   * @param sinceNano - Lower time boundary in nanoseconds (omitted defaults to last 5 minutes)
+   * @param limit - Max entries to retrieve per batch
    */
   async queryErrors(sinceNano?: string, limit = 50): Promise<LokiLogEntry[]> {
     const query = '{level="error"}';
@@ -79,7 +95,6 @@ export class LokiClient {
     if (sinceNano) {
       params.append("start", sinceNano);
     } else {
-      // Default to last 5 minutes
       const fiveMinutesAgo = (BigInt(Date.now() - 5 * 60 * 1000) * 1_000_000n).toString();
       params.append("start", fiveMinutesAgo);
     }
@@ -88,7 +103,10 @@ export class LokiClient {
   }
 
   /**
-   * Queries Loki for context logs (info, warn, error) matching a traceId or service.
+   * Queries correlated context logs matching a service or trace ID to reconstruct failure timeline.
+   *
+   * @param options.traceId - Distributed trace ID to correlate microservice operations
+   * @param options.service - Service identifier to isolate scope
    */
   async queryContext(options: {
     traceId?: string;
@@ -123,7 +141,8 @@ export class LokiClient {
   }
 
   /**
-   * Low-level helper to execute a query_range against Loki and parse JSON log lines.
+   * Executes query_range against Loki and unpacks stream batches.
+   * Gracefully parses JSON log lines, falling back to raw line formatting if unformatted.
    */
   private async executeQuery(params: URLSearchParams): Promise<LokiLogEntry[]> {
     try {
@@ -158,7 +177,7 @@ export class LokiClient {
               rawLine,
             });
           } catch {
-            // Not a JSON log line, create structured entry from raw
+            // Unstructured non-JSON fallback
             entries.push({
               timestamp: new Date(Number(BigInt(timeNano) / 1_000_000n)).toISOString(),
               timeNano,
@@ -172,7 +191,7 @@ export class LokiClient {
         }
       }
 
-      // Sort by timestamp ascending
+      // Order ascending chronologically for linear investigation
       return entries.sort((a, b) => a.timeNano.localeCompare(b.timeNano));
     } catch (error) {
       console.warn("[LokiClient] Error fetching logs from Loki:", (error as Error).message);
@@ -182,7 +201,9 @@ export class LokiClient {
 }
 
 /**
- * Deduplicator to prevent alert spam for recurring identical errors.
+ * Sliding-window error deduplicator.
+ * Generates composite fingerprints for incoming error logs to suppress notification storming
+ * while still capturing repeat occurrence counters.
  */
 export class ErrorDeduplicator {
   private seen = new Map<string, { firstSeen: number; lastSeen: number; count: number }>();
@@ -193,7 +214,7 @@ export class ErrorDeduplicator {
   }
 
   /**
-   * Generates a stable fingerprint for an error log.
+   * Constructs a stable fingerprint based on affected service and error signature.
    */
   getFingerprint(entry: LokiLogEntry): string {
     const service = entry.service || "unknown";
@@ -202,8 +223,7 @@ export class ErrorDeduplicator {
   }
 
   /**
-   * Checks if an error should be alerted or suppressed as duplicate.
-   * Returns { isDuplicate, count }.
+   * Assesses if the given log entry is a duplicate within the current sliding window.
    */
   checkAndRecord(entry: LokiLogEntry): { isDuplicate: boolean; count: number } {
     const now = Date.now();
@@ -216,13 +236,12 @@ export class ErrorDeduplicator {
       return { isDuplicate: true, count: existing.count };
     }
 
-    // New error or window expired
     this.seen.set(fp, { firstSeen: now, lastSeen: now, count: 1 });
     return { isDuplicate: false, count: 1 };
   }
 
   /**
-   * Prune expired entries from memory.
+   * Prunes entries older than 2x the deduplication window to prevent unbounded memory growth.
    */
   cleanup(): void {
     const now = Date.now();
