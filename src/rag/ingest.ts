@@ -1,7 +1,7 @@
 /**
  * @file src/rag/ingest.ts
  * @description Ingestion pipeline script chunking runbook documents and populating Qdrant collections.
- * Recursively scans `./docs`, segments documents into overlapping token-aware chunks via
+ * Recursively scans `./ingest-docs`, segments documents into overlapping token-aware chunks via
  * RecursiveCharacterTextSplitter, computes vector embeddings, and bulk-upserts them to Qdrant.
  */
 
@@ -47,7 +47,7 @@ export async function ingestDocuments(
     allDocs.push(...customDocs);
   }
 
-  const localDir = options.localDir ?? "./docs";
+  const localDir = options.localDir ?? "./ingest-docs";
   const localDocs = await loadLocalDirectory(localDir);
   if (localDocs.length > 0) {
     console.log(`[RAG] Loaded ${localDocs.length} documents from local directory "${localDir}".`);
