@@ -1,5 +1,5 @@
 {
-  "name": "07_incident_notifier",
+  "name": "incident_notifier",
   "module": "src/index.ts",
   "type": "module",
   "private": true,

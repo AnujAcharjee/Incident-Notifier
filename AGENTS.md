@@ -26,6 +26,7 @@ Application Logs → Loki → Error Detection → AI Investigation → Root Caus
 * Use LangGraph.js for agent orchestration.
 * Use Zod to validate outputs.
 * Store secrets in environment variables.
+* Never read, inspect, display, or modify `.env` or any `.env.*` files containing secrets. If configuration values or keys are needed, reference `.env.example` only.
 * Handle errors and retries gracefully.
 * Deduplicate errors to prevent notification spam.
 * Base diagnoses on log evidence; distinguish facts from hypotheses.
